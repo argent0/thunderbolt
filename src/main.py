@@ -117,7 +117,7 @@ class Background:
 class HUD:
 	def __init__(self):
 		self.font = pygame.font.Font(None, 36)
-		self.text = self.font.render("Pummel The Chimp, And Win $$$", 1, (10, 10, 10))
+		self.text = self.font.render("Press 'q' to leave", 1, (10, 10, 10))
 		self.textpos = self.text.get_rect(centerx=width/2)
 
 	def draw(self,surface):
@@ -151,11 +151,12 @@ if __name__ == "__main__":
 	#droplets
 	droplets = []
 	nDroplets = 0;
+	dropletsClock = 0
+	dropletesInitialSpeed = -1; # increaes like the thunder speed
 
 	pygame.event.set_grab(True)
 	pygame.mouse.set_visible(False)
 
-	dropletsClock = 0
 	while 1:
 		clock.tick(max_fps)
 		for event in pygame.event.get():
@@ -172,6 +173,7 @@ if __name__ == "__main__":
 		background.actualize()
 
 		###################################################################
+		# Droplets System
 		# Add droplet system
 		if (nDroplets < max_droplets):
 			dropletsClock += clock.get_time()
@@ -186,6 +188,13 @@ if __name__ == "__main__":
 				print "Removing"
 				del droplets[0]
 				nDroplets -= 1
+
+		##################################################################
+		# Collisions with droplets
+
+		for droplet in droplets:
+			if lightning.rect.colliderect(droplet.rect):
+				print "Droplet collision"
 
 
 		#screen.fill( (0,0,0) )
