@@ -88,8 +88,8 @@ class HeroLighning(Actor):
 		self.limitPosition()
 
 class Droplet(Actor):
-	def __init__(self,_image,_x):
-		Actor.__init__(self,_image,Vector((0,-1)))
+	def __init__(self,_image,_x, _speed):
+		Actor.__init__(self,_image,Vector((0,_speed)))
 		self.rect.x = _x
 		self.rect.y = height
 
@@ -98,8 +98,8 @@ class Droplet(Actor):
 		pass
 
 class Background:
-	def __init__(self,_image):
-		self.scrollspeed = -1
+	def __init__(self,_image, _scrollspeed):
+		self.scrollspeed = _scrollspeed
 		self.image = _image
 		self.pos = 100;
 		self.area_up = pygame.Rect(0,0,width,height)
@@ -120,8 +120,11 @@ class HUD:
 		self.text = self.font.render("Press 'q' to leave", 1, (10, 10, 10))
 		self.textpos = self.text.get_rect(centerx=width/2)
 
-	def draw(self,surface):
-	   surface.blit(self.text, self.textpos)
+	def draw(self,surface,_n):
+		points = self.font.render("Points:"+ str(_n),1,(100,100,100))
+		surface.blit(self.text, self.textpos)
+		pos = points.get_rect(bottomleft=(0,height))
+		surface.blit(points, pos)
 
 def quit():
 	print "OK, bye."
@@ -139,8 +142,12 @@ if __name__ == "__main__":
 	backgroundImage = pygame.image.load(images_path+'sky.png').convert()
 	dropletImage = pygame.image.load(images_path+'drop.png')#.convert()
 
+	#game data
+	gameSpeed = 1;
+	nCollisions = 0; #how many collisions have ocurred
+
 	#some background
-	background = Background(backgroundImage)
+	background = Background(backgroundImage,-gameSpeed)
 
 	#Lightning lightning (lightningImage)
 	lightning = HeroLighning(lightningImage)
@@ -152,7 +159,6 @@ if __name__ == "__main__":
 	droplets = []
 	nDroplets = 0;
 	dropletsClock = 0
-	dropletesInitialSpeed = -1; # increaes like the thunder speed
 
 	pygame.event.set_grab(True)
 	pygame.mouse.set_visible(False)
@@ -177,15 +183,15 @@ if __name__ == "__main__":
 		# Add droplet system
 		if (nDroplets < max_droplets):
 			dropletsClock += clock.get_time()
-			if ( dropletsClock  > 1000/max_droplets_per_second ):
+			if ( dropletsClock  > 1000/max_droplets_per_second/gameSpeed ):
 				dropletsClock = 0
-				droplets.append(Droplet(dropletImage, rng.randint(0,width)))
+				droplets.append(Droplet(dropletImage, rng.randint(0,width),
+					-gameSpeed))
 				nDroplets += 1
 		#######################
 		# Remove droplet system
 		if (nDroplets > 0):
 			if ( droplets[0].rect.y < 0 ):
-				print "Removing"
 				del droplets[0]
 				nDroplets -= 1
 
@@ -194,20 +200,27 @@ if __name__ == "__main__":
 
 		for droplet in droplets:
 			if lightning.rect.colliderect(droplet.rect):
-				print "Droplet collision"
+				droplet.rect.y = -tile_side;
+				nCollisions += 1
+				gameSpeed = 30*(1.-math.exp(-nCollisions*0.005))
+				print gameSpeed
 
 
 		#screen.fill( (0,0,0) )
 		screen.blit(background.image, (0,0),background.area_up ) 
 		screen.blit(background.image, (0,background.pos),background.area_down ) 
+		background.scrollspeed = -gameSpeed*0.5
 
 		# draw droplets system
 		for droplet in droplets:
+			droplet.velocity.set((0,-gameSpeed)) #droplet speed actualization
 			droplet.actualize()
 			droplet.draw(screen)
 		#######################
 
-		hud.draw(screen)
+		##################################################################
+		# HUD update 
+		hud.draw(screen,nCollisions)
 		#screen.blit(lightning.image, lightning.rect)
 		lightning.draw(screen)
 		pygame.display.flip()
