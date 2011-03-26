@@ -9,6 +9,11 @@ tile_side = 32
 max_droplets = 100
 max_fps = 40
 max_droplets_per_second = 2
+air_conductivity_loss_factor = 0.95
+air_conductivity_loss_linear_term = 0.01
+energy_leaks_fps = 1
+game_initial_speed = 5
+game_max_speed = 50
 
 images_path = "../images/"
 
@@ -76,6 +81,7 @@ class HeroLighning(Actor):
 	def __init__(self,_image):
 		self.maxspeed = 400
 		Actor.__init__(self,_image, Vector((0,0)))
+		self.energy = 1 #this is %
 
 	def limitSpeed(self):
 		if ( self.velocity.mod() > self.maxspeed ):
@@ -86,6 +92,8 @@ class HeroLighning(Actor):
 		self.limitSpeed()
 		Particle.actualize(self)
 		self.limitPosition()
+
+		print self.energy
 
 class Droplet(Actor):
 	def __init__(self,_image,_x, _speed):
@@ -120,11 +128,12 @@ class HUD:
 		self.text = self.font.render("Press 'q' to leave", 1, (10, 10, 10))
 		self.textpos = self.text.get_rect(centerx=width/2)
 
-	def draw(self,surface,_n):
-		points = self.font.render("Points:"+ str(_n),1,(100,100,100))
-		surface.blit(self.text, self.textpos)
+	def draw(self,surface,_points,_energy):
+		points = self.font.render("Points:"+ str(_points),1,(100,100,100))
 		pos = points.get_rect(bottomleft=(0,height))
 		surface.blit(points, pos)
+		surface.fill((100,0,0), pygame.Rect(0,0,width*_energy,20) )
+		surface.blit(self.text, self.textpos)
 
 def quit():
 	print "OK, bye."
@@ -143,7 +152,7 @@ if __name__ == "__main__":
 	dropletImage = pygame.image.load(images_path+'drop.png')#.convert()
 
 	#game data
-	gameSpeed = 1;
+	gameSpeed = game_initial_speed;
 	nCollisions = 0; #how many collisions have ocurred
 
 	#some background
@@ -154,6 +163,7 @@ if __name__ == "__main__":
 
 	#HUD
 	hud =HUD()
+	leaksClock = 0
 
 	#droplets
 	droplets = []
@@ -163,17 +173,22 @@ if __name__ == "__main__":
 	pygame.event.set_grab(True)
 	pygame.mouse.set_visible(False)
 
-	while 1:
+	while (lightning.energy > 0 ):
 		clock.tick(max_fps)
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
 				quit()
 			elif event.type == pygame.MOUSEMOTION:
-				#print "Mouse Motion", event.rel
 				lightning.velocity.set(event.rel)
 			elif event.type == pygame.KEYDOWN:
 				if event.unicode == 'q':
 					quit()
+
+		leaksClock += clock.get_time()
+		if (leaksClock > 1000/energy_leaks_fps):
+			leaksClock = 0
+			lightning.energy *= air_conductivity_loss_factor
+			lightning.energy -= air_conductivity_loss_linear_term
 
 		lightning.actualize()
 		background.actualize()
@@ -202,8 +217,7 @@ if __name__ == "__main__":
 			if lightning.rect.colliderect(droplet.rect):
 				droplet.rect.y = -tile_side;
 				nCollisions += 1
-				gameSpeed = 30*(1.-math.exp(-nCollisions*0.005))
-				print gameSpeed
+				gameSpeed = game_initial_speed+(game_max_speed-game_initial_speed)*(1.-math.exp(-nCollisions*0.005))
 
 
 		#screen.fill( (0,0,0) )
@@ -220,7 +234,7 @@ if __name__ == "__main__":
 
 		##################################################################
 		# HUD update 
-		hud.draw(screen,nCollisions)
+		hud.draw(screen,nCollisions,lightning.energy)
 		#screen.blit(lightning.image, lightning.rect)
 		lightning.draw(screen)
 		pygame.display.flip()
