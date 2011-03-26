@@ -15,6 +15,14 @@ energy_leaks_fps = 1
 game_initial_speed = 5
 game_max_speed = 50
 
+#penalties & boni
+energy_bonus_amount = 0.10
+leaf_speed_penalty = -2
+
+#probabilities
+energyBonusProbability = 5
+leaf_probability = 47
+
 images_path = "../images/"
 
 #Load the images
@@ -92,14 +100,17 @@ class HeroLighning(Actor):
 		self.limitSpeed()
 		Particle.actualize(self)
 		self.limitPosition()
+		if self.energy > 1.:
+			self.energy = 1.
 
 		print self.energy
 
 class Droplet(Actor):
-	def __init__(self,_image,_x, _speed):
+	def __init__(self,_image,_x, _speed,_name):
 		Actor.__init__(self,_image,Vector((0,_speed)))
 		self.rect.x = _x
 		self.rect.y = height
+		self.name = _name
 
 	def actualize(self):
 		Actor.actualize(self)
@@ -128,8 +139,8 @@ class HUD:
 		self.text = self.font.render("Press 'q' to leave", 1, (10, 10, 10))
 		self.textpos = self.text.get_rect(centerx=width/2)
 
-	def draw(self,surface,_points,_energy):
-		points = self.font.render("Points:"+ str(_points),1,(100,100,100))
+	def draw(self,surface,_points,_speed,_energy):
+		points = self.font.render("Points: {0:4.0f} (x{1:2.0f})".format(_points,_speed),1,(100,0,0))
 		pos = points.get_rect(bottomleft=(0,height))
 		surface.blit(points, pos)
 		surface.fill((100,0,0), pygame.Rect(0,0,width*_energy,20) )
@@ -150,6 +161,8 @@ if __name__ == "__main__":
 	lightningImage = pygame.image.load(images_path+'lightning.png')#.convert()
 	backgroundImage = pygame.image.load(images_path+'sky.png').convert()
 	dropletImage = pygame.image.load(images_path+'drop.png')#.convert()
+	leafImage = pygame.image.load(images_path+'leaf.png')
+	smallLightningImage = pygame.transform.scale(lightningImage,(tile_side/2,tile_side/2))
 
 	#game data
 	gameSpeed = game_initial_speed;
@@ -164,6 +177,7 @@ if __name__ == "__main__":
 	#HUD
 	hud =HUD()
 	leaksClock = 0
+	points = 0;
 
 	#droplets
 	droplets = []
@@ -200,8 +214,18 @@ if __name__ == "__main__":
 			dropletsClock += clock.get_time()
 			if ( dropletsClock  > 1000/max_droplets_per_second/gameSpeed ):
 				dropletsClock = 0
-				droplets.append(Droplet(dropletImage, rng.randint(0,width),
-					-gameSpeed))
+				tempRN = rng.randint(0,100)
+				if ( tempRN < energyBonusProbability ):
+					tempDropImage = smallLightningImage
+					tempName = "bonus"
+				elif ( tempRN < leaf_probability ):
+					tempDropImage = leafImage
+					tempName = "leaf"
+				else:
+					tempDropImage = dropletImage
+					tempName = "water"
+				droplets.append(Droplet(tempDropImage, rng.randint(0,width),
+					-gameSpeed,tempName))
 				nDroplets += 1
 		#######################
 		# Remove droplet system
@@ -216,7 +240,15 @@ if __name__ == "__main__":
 		for droplet in droplets:
 			if lightning.rect.colliderect(droplet.rect):
 				droplet.rect.y = -tile_side;
-				nCollisions += 1
+				if droplet.name == "water":
+					tempBonus = 1
+				elif droplet.name == "leaf":
+					tempBonus = leaf_speed_penalty
+				elif droplet.name == "bonus":
+					tempBonus = 0;
+					lightning.energy += energy_bonus_amount
+
+				nCollisions += tempBonus
 				gameSpeed = game_initial_speed+(game_max_speed-game_initial_speed)*(1.-math.exp(-nCollisions*0.005))
 
 
@@ -234,7 +266,8 @@ if __name__ == "__main__":
 
 		##################################################################
 		# HUD update 
-		hud.draw(screen,nCollisions,lightning.energy)
+		points += gameSpeed*clock.get_time()*0.01
+		hud.draw(screen,points,gameSpeed,lightning.energy)
 		#screen.blit(lightning.image, lightning.rect)
 		lightning.draw(screen)
 		pygame.display.flip()
