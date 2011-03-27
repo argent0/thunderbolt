@@ -23,6 +23,8 @@ Current status: Working concept
 TASKS:
 
 *finish the game mechanics
+	-->you gain points per distance traveled [DONE]
+	-->and adverse droplets, leaves reduce your speed [DONE]
 *finish the hud
 *add stuff till time runs out
 	* think

@@ -24,8 +24,13 @@ energyBonusProbability = 5
 leaf_probability = 47
 
 images_path = "../images/"
+sfx_path = "../sounds/"
 
 #Load the images
+
+def quit():
+	print "OK, bye."
+	sys.exit()
 
 class Vector:
 	def __init__(self,_tup):
@@ -68,9 +73,6 @@ class Actor(Particle):
 	def __init__(self, _image,_velocity):
 		Particle.__init__(self,_image.get_rect(),_velocity)
 		self.image = _image
-
-	def moveLeft(self,_delta):
-		self.rect.x += _delta
 
 	def limitPosition(self):
 		if (self.rect.x < 0 ):
@@ -146,9 +148,139 @@ class HUD:
 		surface.fill((100,0,0), pygame.Rect(0,0,width*_energy,20) )
 		surface.blit(self.text, self.textpos)
 
-def quit():
-	print "OK, bye."
-	sys.exit()
+class FlashyFont:
+	def __init__(self,_clock,_colorA,_colorB,_surface,_text,_y_pos,_flash_delay=100,_flick=2):
+		self.clock = _clock
+		self.A = _colorA
+		self.B = _colorB
+		self.surface = _surface
+		self.timer = 0
+		self.text = _text
+		self.font = pygame.font.Font(None, 36)
+		self.cColor = _colorA #current color
+		self.yPos = _y_pos
+
+		self.flashDelay = _flash_delay
+		self.flick = _flick
+		self.flickSign = 1
+
+	def draw(self):
+		rText = self.font.render(self.text, 1, self.cColor)
+		tPos = rText.get_rect(centerx=width/2)
+		tPos.top = self.yPos+self.flick*self.flickSign
+		self.surface.blit(rText, tPos)
+
+	def actualize(self):
+		self.timer += self.clock.get_time()
+		if ( self.timer > self.flashDelay ):
+			if self.cColor == self.A:
+				self.cColor = self.B
+			else:
+				self.cColor = self.A
+
+			self.flick *= -1
+
+			self.timer = 0
+
+			return True
+
+		else:
+			return False
+
+class DropletSyste:
+	""" This is the class tha makes rain upwards """
+	def __init__(self, _dlist, _clock):
+		self.dlist = _dlist
+		self.nDroplets = 0
+		self.dropletsClock = 0
+		self.clock = _clock
+
+	def add(self,gameSpeed):
+		###################################################################
+		# Droplets System
+		# Add droplet system
+		if (self.nDroplets < max_droplets):
+			self.dropletsClock += self.clock.get_time()
+			if ( self.dropletsClock  > 1000/max_droplets_per_second/gameSpeed ):
+				self.dropletsClock = 0
+				tempRN = rng.randint(0,100)
+				if ( tempRN < energyBonusProbability ):
+					tempDropImage = smallLightningImage
+					tempName = "bonus"
+				elif ( tempRN < leaf_probability ):
+					tempDropImage = leafImage
+					tempName = "leaf"
+				else:
+					tempDropImage = dropletImage
+					tempName = "water"
+				self.dlist.append(Droplet(tempDropImage, rng.randint(0,width),
+					-gameSpeed,tempName))
+				self.nDroplets += 1
+
+	def remove(self):
+		#######################
+		# Remove droplet system
+		if (self.nDroplets > 0):
+			if ( self.dlist[0].rect.y < 0 ):
+				del self.dlist[0]
+				self.nDroplets -= 1
+
+	def draw(self,surface,gameSpeed):
+		# draw droplets system
+		for droplet in self.dlist:
+			droplet.velocity.set((0,-gameSpeed)) #droplet speed actualization
+			droplet.actualize()
+			droplet.draw(surface)
+		#######################
+
+
+
+class Slide:
+	def __init__(self, _filename,_surface):
+		self.image = pygame.image.load(images_path+_filename).convert()
+		self.surface = _surface
+
+	def run(self):
+		clock = pygame.time.Clock()
+		sfx = pygame.mixer.music.load(sfx_path+'LRStorm 01 by Teza.ogg')
+		#sfx = pygame.mixer.music.load(sfx_path+'water2.wav')
+
+		ff = FlashyFont(clock, (200,200,200),(200,200,0),self.surface,"Press spacebar to start",height*3/4)
+		ff2 = FlashyFont(clock, (200,200,200),(200,200,0),self.surface,"<ESC> To exit",height*3/4+50)
+		screen.blit(self.image, (0,0) ) 
+		ff.draw()
+		ff2.draw()
+		pygame.display.flip()
+
+		droplets = []
+		ds = DropletSyste(droplets,clock)
+		speed = 10
+
+		pygame.mixer.music.play(-1)
+
+		while 1:
+			clock.tick(max_fps)
+			ff.actualize()
+			ff2.actualize()
+			for event in pygame.event.get():
+				if event.type == pygame.QUIT:
+					quit()
+				elif event.type == pygame.KEYDOWN:
+					if event.unicode == ' ':
+						return
+					if event.key == 27:
+						quit()
+
+			ds.add(speed)
+			ds.remove()
+
+			screen.blit(self.image, (0,0) ) 
+			ds.draw(self.surface,speed)
+
+
+			ff.draw()
+			ff2.draw()
+			pygame.display.flip()
 
 if __name__ == "__main__":
 		
@@ -163,6 +295,10 @@ if __name__ == "__main__":
 	dropletImage = pygame.image.load(images_path+'drop.png')#.convert()
 	leafImage = pygame.image.load(images_path+'leaf.png')
 	smallLightningImage = pygame.transform.scale(lightningImage,(tile_side/2,tile_side/2))
+
+	#sound loading
+	waterSound = pygame.mixer.Sound(sfx_path+'drip.ogg')
+	thunderSound = pygame.mixer.Sound(sfx_path+'thunder.ogg')
 
 	#game data
 	gameSpeed = game_initial_speed;
@@ -181,13 +317,15 @@ if __name__ == "__main__":
 
 	#droplets
 	droplets = []
-	nDroplets = 0;
-	dropletsClock = 0
+	ds = DropletSyste(droplets,clock)
 
 	pygame.event.set_grab(True)
 	pygame.mouse.set_visible(False)
 
-	while (lightning.energy > 0 ):
+	slide = Slide('front.png',screen)
+	slide.run()
+		
+	while ( (lightning.energy > 0 ) and ( gameSpeed >= 0 ) ):
 		clock.tick(max_fps)
 		for event in pygame.event.get():
 			if event.type == pygame.QUIT:
@@ -207,32 +345,8 @@ if __name__ == "__main__":
 		lightning.actualize()
 		background.actualize()
 
-		###################################################################
-		# Droplets System
-		# Add droplet system
-		if (nDroplets < max_droplets):
-			dropletsClock += clock.get_time()
-			if ( dropletsClock  > 1000/max_droplets_per_second/gameSpeed ):
-				dropletsClock = 0
-				tempRN = rng.randint(0,100)
-				if ( tempRN < energyBonusProbability ):
-					tempDropImage = smallLightningImage
-					tempName = "bonus"
-				elif ( tempRN < leaf_probability ):
-					tempDropImage = leafImage
-					tempName = "leaf"
-				else:
-					tempDropImage = dropletImage
-					tempName = "water"
-				droplets.append(Droplet(tempDropImage, rng.randint(0,width),
-					-gameSpeed,tempName))
-				nDroplets += 1
-		#######################
-		# Remove droplet system
-		if (nDroplets > 0):
-			if ( droplets[0].rect.y < 0 ):
-				del droplets[0]
-				nDroplets -= 1
+		ds.add(gameSpeed)
+		ds.remove()
 
 		##################################################################
 		# Collisions with droplets
@@ -242,10 +356,12 @@ if __name__ == "__main__":
 				droplet.rect.y = -tile_side;
 				if droplet.name == "water":
 					tempBonus = 1
+					waterSound.play()
 				elif droplet.name == "leaf":
 					tempBonus = leaf_speed_penalty
 				elif droplet.name == "bonus":
 					tempBonus = 0;
+					thunderSound.play()
 					lightning.energy += energy_bonus_amount
 
 				nCollisions += tempBonus
@@ -257,12 +373,7 @@ if __name__ == "__main__":
 		screen.blit(background.image, (0,background.pos),background.area_down ) 
 		background.scrollspeed = -gameSpeed*0.5
 
-		# draw droplets system
-		for droplet in droplets:
-			droplet.velocity.set((0,-gameSpeed)) #droplet speed actualization
-			droplet.actualize()
-			droplet.draw(screen)
-		#######################
+		ds.draw(screen,gameSpeed)
 
 		##################################################################
 		# HUD update 

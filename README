@@ -1,5 +1,11 @@
-Simple verscroll game
+Simple vertical scroll game. Featuring a charged particle (Lightning) in his way
+through the air.
+The particle should grab little water drops suspended into air in order to gain
+speed due to the reduced resistivity.
+Avoid green leaves that reduce your speed.
+Grab other smaller charged particles to gain charge.
+Travel the maximum possible distance before you loose your charge.
 
-REQUIERES: python2 &  pygame with image suppourt
+REQUIRES: python2 &  pygame with image support
 
 AUTHOR: Aner Oscar Lucero
